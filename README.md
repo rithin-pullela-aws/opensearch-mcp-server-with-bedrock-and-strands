@@ -243,6 +243,7 @@ All configuration is managed through environment variables (`.env` file):
 - `BEDROCK_MODEL_ID`: Bedrock model to use (default: `us.anthropic.claude-sonnet-4-5-20250929-v1:0`)
 - `MCP_URL`: OpenSearch MCP endpoint (default: auto-constructed from OPENSEARCH_URL)
 - `MCP_BEARER`: Bearer token for MCP authentication (overrides basic auth)
+- `VERIFY_SSL`: Enable/disable SSL certificate verification (default: `true`, set to `false` for self-signed certificates)
 - `SYSTEM_PROMPT`: Custom system prompt as a string
 - `SYSTEM_PROMPT_FILE`: Path to file containing custom system prompt
 
@@ -273,6 +274,11 @@ If neither is set, the agent uses the default prompt optimized for OpenSearch DS
 - Verify `MCP_URL` is correct and accessible
 - Check AWS credentials are configured
 - Ensure Bedrock model access is enabled in your region
+
+**SSL Certificate errors:**
+- For self-signed certificates, set `VERIFY_SSL=false` in your `.env` file
+- **Warning**: Only disable SSL verification in development/testing environments
+- For production, use properly signed certificates
 
 **Invalid DSL generated:**
 - Review the system prompt for clarity

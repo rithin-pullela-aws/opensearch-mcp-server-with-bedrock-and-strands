@@ -1,7 +1,17 @@
-# app.py
+"""
+OpenSearch Agentic Search with AWS Bedrock and MCP
+
+This agent translates natural language queries into OpenSearch DSL queries
+using AWS Bedrock (Claude Sonnet) and the Model Context Protocol (MCP).
+
+Configuration is managed through environment variables (.env file).
+See README.md for setup instructions.
+"""
 import os
 import json
 import base64
+import ssl
+import warnings
 from pathlib import Path
 from strands import Agent
 from strands.models import BedrockModel
@@ -15,6 +25,30 @@ try:
     load_dotenv()
 except ImportError:
     pass  # dotenv not installed, will use system environment variables
+
+# SSL verification configuration - must be set before any SSL connections
+VERIFY_SSL = os.getenv("VERIFY_SSL", "true").lower() in ("true", "1", "yes")
+if not VERIFY_SSL:
+    # Disable SSL warnings when verification is disabled
+    import urllib3
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    
+    # Monkey-patch SSL module to create unverified contexts globally
+    _original_create_default_context = ssl.create_default_context
+    
+    def _create_unverified_context(purpose=ssl.Purpose.SERVER_AUTH, *args, **kwargs):
+        ctx = _original_create_default_context(purpose, *args, **kwargs)
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    
+    ssl.create_default_context = _create_unverified_context
+    
+    print("⚠️  SSL verification disabled - use only in development!")
+
+# =============================================================================
+# AGENT SYSTEM PROMPT
+# =============================================================================
 
 DEFAULT_SYSTEM_PROMPT = """
 ==== PURPOSE ====
@@ -84,7 +118,6 @@ DEFAULT_SYSTEM_PROMPT = """
  }
 """
 
-# Load system prompt from environment variable or file, or use default
 def load_system_prompt():
     """Load system prompt from environment, file, or use default."""
     # First, check if SYSTEM_PROMPT is set directly
@@ -102,16 +135,20 @@ def load_system_prompt():
 
 system_prompt = load_system_prompt()
 
-# Bedrock model: enable streaming to get partial tokens back
+# =============================================================================
+# BEDROCK MODEL CONFIGURATION
+# =============================================================================
+
 model = BedrockModel(
     model_id=os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
     region_name=os.getenv("AWS_REGION", "us-east-1"),
     streaming=False,
 )
 
-# --- MCP via Streamable HTTP ---
-# Point this at your MCP server's Streamable HTTP endpoint (tool hub, searcher, etc.)
-# Configure OpenSearch connection
+# =============================================================================
+# MCP CLIENT CONFIGURATION
+# =============================================================================
+
 OPENSEARCH_URL = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
 OPENSEARCH_USERNAME = os.getenv("OPENSEARCH_USERNAME", "admin")
 OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "admin")
@@ -119,28 +156,42 @@ OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "admin")
 # MCP endpoint configuration
 MCP_URL = os.getenv("MCP_URL", f"{OPENSEARCH_URL}/_plugins/_ml/mcp/")
 
-# Setup MCP headers
+# Setup authentication headers
 MCP_HEADERS = {}
 if "MCP_BEARER" in os.environ:
     MCP_HEADERS["Authorization"] = f"Bearer {os.getenv('MCP_BEARER')}"
 elif OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
-    # Add basic auth if username/password are provided
     credentials = base64.b64encode(f"{OPENSEARCH_USERNAME}:{OPENSEARCH_PASSWORD}".encode()).decode()
     MCP_HEADERS["Authorization"] = f"Basic {credentials}"
 
-mcp_client = MCPClient(lambda: streamablehttp_client(MCP_URL, headers=MCP_HEADERS))
+# Create MCP client with custom transport factory for SSL verification control
+def create_mcp_transport():
+    """
+    Custom transport factory that creates an MCP transport with SSL verification control.
+    The SSL context is configured globally via monkey-patching when VERIFY_SSL=false.
+    """
+    return streamablehttp_client(MCP_URL, headers=MCP_HEADERS)
 
-# Build the Strands agent with model, system prompt, and MCP tools (managed integration)
+mcp_client = MCPClient(transport_callable=create_mcp_transport)
+
+# =============================================================================
+# AGENT INITIALIZATION
+# =============================================================================
+
 agent = Agent(
     model=model,
     system_prompt=system_prompt,
-    tools=[mcp_client],  # Strands will connect, discover, and use MCP tools
+    tools=[mcp_client],
 )
 
-# --- AgentCore Runtime wrapper ---
+# =============================================================================
+# AGENTCORE RUNTIME & HELPER FUNCTIONS
+# =============================================================================
+
 app = BedrockAgentCoreApp()
 
-default_match_all_query = '{"query":{"match_all":{}}}'
+DEFAULT_MATCH_ALL_QUERY = '{"query":{"match_all":{}}}'
+
 def extract_json(response) -> dict:
     """
     Extract the JSON object from the response, even if it's embedded within other text.
@@ -180,8 +231,10 @@ def extract_json(response) -> dict:
     except json.JSONDecodeError as e:
         raise ValueError(f"Failed to extract JSON object from text: {e}")
 
-    
-# Simple JSON in, JSON/stream out contract for AgentCore /invocations
+# =============================================================================
+# ENTRYPOINT
+# =============================================================================
+
 @app.entrypoint
 async def invoke(payload: dict):
     """
@@ -206,22 +259,21 @@ async def invoke(payload: dict):
     try:
         parsed_json = extract_json(message_text)
         print(f"Parsed JSON (text removed): {parsed_json}")
-        cleaned_json = parsed_json.get("dsl_query", json.loads(default_match_all_query))
-        # Convert the parsed JSON back to a string
+        cleaned_json = parsed_json.get("dsl_query", json.loads(DEFAULT_MATCH_ALL_QUERY))
         cleaned_json_string = json.dumps(cleaned_json)
         print(f"Cleaned JSON string: {cleaned_json_string}")
         
     except (ValueError, json.JSONDecodeError) as e:
-        # If JSON extraction fails, use the default match_all query
         print(f"Failed to extract JSON from response: {e}")
-        cleaned_json_string = default_match_all_query
+        cleaned_json_string = DEFAULT_MATCH_ALL_QUERY
 
     # Replace the text content with the cleaned JSON string
     result.message['content'][0]['text'] = cleaned_json_string
     print(f"result.message (cleaned): {result.message}")
 
-    # Return the modified result.message dict (same structure as temp_agent.py)
     return result.message
+
 if __name__ == "__main__":
-    print("Starting agent example...")
+    print("Starting Bedrock Agent with OpenSearch MCP integration...")
+    print(f"Connecting to: {OPENSEARCH_URL}")
     app.run()
