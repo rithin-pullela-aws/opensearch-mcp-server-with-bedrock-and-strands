@@ -1,6 +1,10 @@
 # OpenSearch MCP Server with Bedrock and Strands
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 This project implements an **Agentic Search** system that translates natural language queries into OpenSearch DSL queries using AWS Bedrock, the Strands agent framework, and the Model Context Protocol (MCP).
+
+**Open Source**: This project is released under the MIT License - feel free to use, modify, and distribute as you wish!
 
 ## Overview
 
@@ -33,11 +37,39 @@ pip install -r requirements.txt
 ```
 
 3. **Set up environment variables:**
+
+Create a `.env` file in the project root (copy from `env.example`):
+
 ```bash
-export AWS_REGION="us-east-1"  # Your AWS region
-export MCP_URL="http://localhost:9200/_plugins/_ml/mcp/"  # Your OpenSearch MCP endpoint
-export MCP_BEARER="your-bearer-token"  # Optional: if authentication is required
+cp env.example .env
 ```
+
+Edit `.env` with your configuration:
+
+```bash
+# AWS Configuration
+AWS_REGION=us-east-1
+
+# Bedrock Model Configuration
+BEDROCK_MODEL_ID=us.anthropic.claude-sonnet-4-5-20250929-v1:0
+
+# OpenSearch Configuration
+OPENSEARCH_URL=http://localhost:9200
+OPENSEARCH_USERNAME=admin
+OPENSEARCH_PASSWORD=admin
+
+# MCP Configuration
+MCP_URL=http://localhost:9200/_plugins/_ml/mcp/
+# Optional: Uncomment if you need bearer token authentication
+# MCP_BEARER=your-bearer-token-here
+
+# Optional: Customize the system prompt
+# SYSTEM_PROMPT_FILE=custom_prompt.txt
+# or set it directly:
+# SYSTEM_PROMPT="Your custom system prompt..."
+```
+
+**Important**: The `.env` file is gitignored for security. Never commit credentials to version control!
 
 ## Setup Agentic Search in OpenSearch
 
@@ -199,12 +231,37 @@ The agent will start on `http://localhost:8080` and accept invocation requests.
 
 ## Configuration
 
-The main configuration options in `agent_example.py`:
+All configuration is managed through environment variables (`.env` file):
 
-- `model_id`: Bedrock model to use (default: Claude Sonnet 4.5)
-- `MCP_URL`: OpenSearch MCP endpoint URL
-- `AWS_REGION`: AWS region for Bedrock
-- `system_prompt`: Detailed instructions for the agent's behavior
+### Required Variables:
+- `AWS_REGION`: AWS region for Bedrock (default: `us-east-1`)
+- `OPENSEARCH_URL`: Your OpenSearch cluster URL (default: `http://localhost:9200`)
+- `OPENSEARCH_USERNAME`: OpenSearch username (default: `admin`)
+- `OPENSEARCH_PASSWORD`: OpenSearch password (default: `admin`)
+
+### Optional Variables:
+- `BEDROCK_MODEL_ID`: Bedrock model to use (default: `us.anthropic.claude-sonnet-4-5-20250929-v1:0`)
+- `MCP_URL`: OpenSearch MCP endpoint (default: auto-constructed from OPENSEARCH_URL)
+- `MCP_BEARER`: Bearer token for MCP authentication (overrides basic auth)
+- `SYSTEM_PROMPT`: Custom system prompt as a string
+- `SYSTEM_PROMPT_FILE`: Path to file containing custom system prompt
+
+### Custom System Prompts
+
+You can customize the agent's behavior by providing your own system prompt:
+
+**Option 1: Direct environment variable**
+```bash
+export SYSTEM_PROMPT="Your custom instructions here..."
+```
+
+**Option 2: From a file**
+```bash
+echo "Your custom instructions here..." > my_prompt.txt
+export SYSTEM_PROMPT_FILE=my_prompt.txt
+```
+
+If neither is set, the agent uses the default prompt optimized for OpenSearch DSL generation.
 
 ## Troubleshooting
 
@@ -224,13 +281,37 @@ The main configuration options in `agent_example.py`:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! This is an open-source project and we appreciate:
+
+- Bug reports and fixes
+- Feature requests and implementations
+- Documentation improvements
+- Example use cases and tutorials
+
+Please feel free to:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a Pull Request
 
 ## License
 
-[Specify your license here]
+This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
 
-## Contact
+You are free to use, modify, and distribute this software for any purpose, including commercial applications, with no restrictions.
 
-[Your contact information]
+## Support
+
+If you encounter issues or have questions:
+- Open an issue on GitHub
+- Check existing issues for solutions
+- Review the troubleshooting section above
+
+## Acknowledgments
+
+Built with:
+- [AWS Bedrock](https://aws.amazon.com/bedrock/) - Foundation model hosting
+- [Strands](https://github.com/anthropics/strands) - Agent orchestration framework
+- [OpenSearch](https://opensearch.org/) - Search and analytics engine
+- [MCP (Model Context Protocol)](https://modelcontextprotocol.io/) - Tool integration protocol
 

@@ -1,13 +1,22 @@
 # app.py
 import os
 import json
+import base64
+from pathlib import Path
 from strands import Agent
 from strands.models import BedrockModel
 from strands.tools.mcp import MCPClient
 from mcp.client.streamable_http import streamablehttp_client
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
-system_prompt = """
+# Load environment variables from .env file if it exists
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not installed, will use system environment variables
+
+DEFAULT_SYSTEM_PROMPT = """
 ==== PURPOSE ====
  Produce correct OpenSearch DSL by orchestrating tools. You MUST call the Query Planner Tool (query_planner_tool, "qpt") to author the DSL. 
  Your job: (a) gather only essential factual context, (b) compose a self-contained natural-language question for qpt, (c) validate coverage of qpt's DSL and iterate if needed, then (d) return a strict JSON result with the DSL and a brief step trace.
@@ -75,20 +84,49 @@ system_prompt = """
  }
 """
 
+# Load system prompt from environment variable or file, or use default
+def load_system_prompt():
+    """Load system prompt from environment, file, or use default."""
+    # First, check if SYSTEM_PROMPT is set directly
+    if os.getenv("SYSTEM_PROMPT"):
+        return os.getenv("SYSTEM_PROMPT")
+    
+    # Second, check if SYSTEM_PROMPT_FILE is set
+    prompt_file = os.getenv("SYSTEM_PROMPT_FILE")
+    if prompt_file and Path(prompt_file).exists():
+        with open(prompt_file, 'r') as f:
+            return f.read()
+    
+    # Default to the built-in prompt
+    return DEFAULT_SYSTEM_PROMPT
+
+system_prompt = load_system_prompt()
 
 # Bedrock model: enable streaming to get partial tokens back
 model = BedrockModel(
-    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+    model_id=os.getenv("BEDROCK_MODEL_ID", "us.anthropic.claude-sonnet-4-5-20250929-v1:0"),
     region_name=os.getenv("AWS_REGION", "us-east-1"),
     streaming=False,
 )
 
 # --- MCP via Streamable HTTP ---
-# Point this at your MCP server’s Streamable HTTP endpoint (tool hub, searcher, etc.)
-MCP_URL = os.getenv("MCP_URL", "http://localhost:9200/_plugins/_ml/mcp/")
+# Point this at your MCP server's Streamable HTTP endpoint (tool hub, searcher, etc.)
+# Configure OpenSearch connection
+OPENSEARCH_URL = os.getenv("OPENSEARCH_URL", "http://localhost:9200")
+OPENSEARCH_USERNAME = os.getenv("OPENSEARCH_USERNAME", "admin")
+OPENSEARCH_PASSWORD = os.getenv("OPENSEARCH_PASSWORD", "admin")
+
+# MCP endpoint configuration
+MCP_URL = os.getenv("MCP_URL", f"{OPENSEARCH_URL}/_plugins/_ml/mcp/")
+
+# Setup MCP headers
 MCP_HEADERS = {}
 if "MCP_BEARER" in os.environ:
     MCP_HEADERS["Authorization"] = f"Bearer {os.getenv('MCP_BEARER')}"
+elif OPENSEARCH_USERNAME and OPENSEARCH_PASSWORD:
+    # Add basic auth if username/password are provided
+    credentials = base64.b64encode(f"{OPENSEARCH_USERNAME}:{OPENSEARCH_PASSWORD}".encode()).decode()
+    MCP_HEADERS["Authorization"] = f"Basic {credentials}"
 
 mcp_client = MCPClient(lambda: streamablehttp_client(MCP_URL, headers=MCP_HEADERS))
 

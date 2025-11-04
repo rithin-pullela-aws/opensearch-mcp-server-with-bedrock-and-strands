@@ -2,3 +2,4 @@ strands-agents
 bedrock-agentcore
 mcp
 boto3
+python-dotenv
