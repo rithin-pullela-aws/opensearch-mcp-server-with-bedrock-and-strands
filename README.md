@@ -77,17 +77,17 @@ Follow these steps to configure Agentic Search in your OpenSearch cluster:
 
 ### Step 1: Create a Connector Tool
 
-Create a Lambda connector that will invoke the Bedrock agent:
+Create a connector that will invoke the Bedrock agent:
 
 ```bash
 POST /_plugins/_ml/connectors/_create
 {
-  "name": "Lambda connector of simple calculator",
-  "description": "Demo connector of lambda function",
+  "name": "Conenctor to AgentCore",
+  "description": "Demo connector of function",
   "version": 1,
   "protocol": "http",
   "parameters": {
-    "service_name": "lambda"
+    // add if needed
   },
   "credential": {
     "access": "rand"
