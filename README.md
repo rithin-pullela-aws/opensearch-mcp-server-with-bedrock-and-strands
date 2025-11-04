@@ -1,10 +1,10 @@
 # OpenSearch MCP Server with Bedrock and Strands
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
 This project implements an **Agentic Search** system that translates natural language queries into OpenSearch DSL queries using AWS Bedrock, the Strands agent framework, and the Model Context Protocol (MCP).
 
-**Open Source**: This project is released under the MIT License - feel free to use, modify, and distribute as you wish!
+**Open Source**: This project is released under the Apache 2.0 License - feel free to use, modify, and distribute as you wish!
 
 ## Overview
 
@@ -296,9 +296,9 @@ Please feel free to:
 
 ## License
 
-This project is licensed under the **MIT License** - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](LICENSE) file for details.
 
-You are free to use, modify, and distribute this software for any purpose, including commercial applications, with no restrictions.
+You are free to use, modify, and distribute this software for any purpose, including commercial applications. The Apache 2.0 license also provides an express grant of patent rights from contributors to users.
 
 ## Support
 
